@@ -1,107 +1,67 @@
-// type 1: parent process
-// input: DIR - process_count(unnamed pipe) - quit - 
-
-// type 2: check file -> named pipe
-
-// type 3:  sum corrupted files (named pipe)
-
 #include <iostream>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
+#include <cstdlib>
+#include <dirent.h>
+#include <cstring>
 #include <fstream>
-
-
 using namespace std;
+#define MAX_FILES_NUMBER 5000
 
-int main(void)
+unsigned int get_files(string dirname, string* files)
 {
-	string dirname;
+	int i = 0;
+	struct dirent *pDirent;
+	DIR *pDir;
+
+	if (pDir == NULL) {
+		cout << "Cannot open directory " << dirname << endl;
+		return -1;
+	}
+
+	pDir = opendir(dirname.c_str());
+	while ((pDirent = readdir(pDir)) != NULL) {
+		if (strcmp(pDirent->d_name, "..") == 0 || strcmp(pDirent->d_name, ".") == 0 )
+			continue;
+		files[i] = pDirent->d_name;
+		i++;
+	}
+	closedir (pDir);
+	return (i-1);
+}
+
+int main (int argc, char *argv[])
+{
+	char data[1000];
+	unsigned int num_files;
 	unsigned int process_count;
-	cout << "enter dirname: " << endl;
-	cin >> dirname;
-	cout << "enter process_count: " << endl;	
-	cin	>> process_count;
+	string files[MAX_FILES_NUMBER];
 
-   // open a file in read mode.
-   ifstream infile; 
-   infile.open("afile.dat"); 
- 
-   cout << "Reading from the file" << endl; 
-   infile >> data; 
+	if (argc < 3)
+	{
+		cout << "Usage: ./a.out <dirname> <process_count>\n";
+		return 1;
+	}
 
-   // write the data at the screen.
-   cout << data << endl;
-   
-   // again read the data from the file and display it.
-   infile >> data; 
-   cout << data << endl; 
+	process_count = atoi(argv[2]);
+	string dirname = argv[1];
+	num_files = get_files(argv[1], files); // files of the DIR directory are in "files" array
 
-   // close the opened file.
-   infile.close();
+	// printing file names
+	for (int i = 0; i <= num_files; ++i)
+		cout << files[i] << endl;
 
-   return 0;	
+	// opening files
+	for (int i = 0; i <= num_files; ++i)
+	{
+		ifstream infile;
+		infile.open((dirname + files[i]).c_str()); 
+		cout << "Reading from the file: " << dirname + files[i] << endl; 
 
-	// int pid;
-	// for (int i = 0; i < process_count; ++i)
-	// {
-	// 	if((pid = fork()) == -1)
-	// 	{
-	// 		cout << "child nubmber: " << i << " failed to be created" << endl;
-	// 		return -1;
-	// 	}
-	// 	if (pid == 0)
-	// 	{
-	// 		// child
-	// 		cout << "child number: " << i << " created" << endl;
-	// 	}
-	// 	else
-	// 	{
-	// 		// parent
-	// 		cout << "I am parent number: " << i << endl;
-	// 	}
-	// }
-
-
-
-
-
-
-
-	// int nbytes;
-	// int pfds[2];
-	// pid_t child_pid;
-
-	// char text[] = "sag\n";
-	// char buffer[100];
-
-	// pipe(pfds);
-
-	// if ((child_pid = fork()) == -1)
-	// {
- //        perror("fork");
- //        exit(1);		
-	// }
-
-	// if (child_pid == 0)
-	// {
-	// 	// Child process
-	// 	close(pfds[0]);	// close pipe's read files descriptor
- //        write(pfds[1], text, (strlen(text)+1));
- //        // exit(0);
-	// }
-	// else
-	// {
-	// 	// Parent Process
-	// 	close(pfds[1]);	// close pipe's write files descriptor
-	// 	nbytes = read(pfds[0], buffer, sizeof(buffer));
-	// 	printf("string is: %s", buffer);
-	// 	exit(0);
-	// }
-
-	// return 0;
+		string line;
+		while(getline(infile, line))
+			cout << line << endl;
+		// close the opened file.
+		infile.close();	
+		cout << "Files Ended ^__^" << endl;
+	}
+	return 0;
 }
