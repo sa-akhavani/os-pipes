@@ -5,11 +5,14 @@
 #include <dirent.h>
 #include <cstring>
 #include <fstream>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <vector>
 #include <string>
+#include <signal.h>
 using namespace std;
 
 class User
@@ -33,4 +36,5 @@ bool parse_file(string file);
 string get_file_name(string buf);
 int get_files_count(string buf);
 int get_start_idx(string buf);
+int count_files(string tmp);
 #endif

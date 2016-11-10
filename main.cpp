@@ -6,7 +6,6 @@
 
 int main(int argc, char *argv[])
 {
-	char data[1000];
 	unsigned int num_files;
 	unsigned int process_count;
 	string files[MAX_FILES_NUMBER];
@@ -22,8 +21,6 @@ int main(int argc, char *argv[])
 
 	num_files = get_files(argv[1], files); // files of the DIR directory are in "files" array
 
-	// new
-
 	int pfds[process_count][2];
 	pid_t pid[process_count];
 	int file_per_process;
@@ -34,102 +31,240 @@ int main(int argc, char *argv[])
 		file_per_process = num_files / process_count + 1;
 
 	int current_file_number = 0;
-	
-	//	Creation of pipes being started
-	for (int i = 0; i < process_count; ++i)
+
+
+
+	// FIFO
+	int fifo_rfd, fifo_wfd;
+	pid_t fifo_pid;
+	mknod(FIFO_NAME, S_IFIFO | 0666, 0);
+	if ((fifo_pid = fork()) == -1)
 	{
-		pipe(pfds[i]);
-		if ((pid[i] = fork()) == -1)
+		cout << "Fork Error\n";
+		return -1;
+	}
+	if (fifo_pid == 0)
+	{
+		// child
+		fifo_rfd = open(FIFO_NAME, O_RDONLY);
+
+		ofstream outfile;
+		outfile.open("output.txt");
+
+
+		vector<string> cor_files;
+		vector<string> healthy_files;
+		int showed = 0;
+
+		int corrupt_count = 0;
+		string corrupt_files[MAX_FILES_NUMBER];
+		int remain_files = num_files;
+		int corupted_files_showd = 0;
+		int nbytes;
+		char buf[MAX_BUFF_LEN];
+		int idx = 0;
+		string tmp = "";
+		while(1)
 		{
-			cout << "Fork Error\n";
-			return -1;
-		}
-		if (pid[i] == 0)
-		{
-			// child [i]
-			// cout << "child [" << i << "]\n";
-			close(pfds[i][1]);
+			nbytes = read(fifo_rfd, buf, MAX_BUFF_LEN);
+			if (nbytes == 0)
+				continue;
+			idx++;
 
-			int files_count;
-			char buf[MAX_BUFF_LEN];
-
-			read(pfds[i][0], buf, MAX_BUFF_LEN);			// read file text
-			close(pfds[i][0]);
-
-			files_count = get_files_count(buf);
-
-			string file_names[files_count];
-			bool correct_or_not[files_count];
-
-
-			int idx = get_start_idx(buf);					// skiping files count line
-			for (int z = 0; z < files_count; ++z)
+			for (int r = 0; r < nbytes; r++)
 			{
-				string new_file = "";
-				int k;
-				for (k = idx; buf[k] != '\0'; ++k)
+				if (buf[r] == '\0')
+					continue;
+				tmp += buf[r];
+			}
+
+			// cout << "tmp: " << tmp << endl;	
+			string tmp_name = "";
+			for (int r = 0; r < tmp.length(); ++r)
+			{
+				if (tmp[r] != ':')
+					tmp_name += tmp[r];
+				else if (tmp[r+1] == 't')
 				{
-					if (buf[k] != '|')
+					bool consists = false;
+					for (int z = 0; z < healthy_files.size(); ++z)
 					{
-						new_file += buf[k];
-						continue;
+						if (healthy_files[z] == tmp_name)
+						{
+							consists = true;
+							break;
+						}
+					}
+					if (consists == false)		
+					{
+						healthy_files.push_back(tmp_name);
+						// cout << "removed\n";
+						remain_files--;
+					}
+					tmp_name = "";
+					r+=2;
+				}
+				else
+				{
+					// cout << tmp_name << endl;
+					bool consists = false;
+					for (int z = 0; z < cor_files.size(); ++z)
+					{
+						if (cor_files[z] == tmp_name)
+						{
+							consists = true;
+							break;
+						}
+					}
+					if (consists == false)
+					{
+						// cout << "added!" << endl;
+						cor_files.push_back(tmp_name);
+						remain_files--;
+					}
+					tmp_name = "";
+					r += 2;
+				}
+			}
+		
+			// cout << "rm: " << remain_files << endl;
+			// cout << "cor: " << cor_files.size() << endl;
+			// cout << "ncor " << healthy_files.size() << endl;
+ 
+			if ((cor_files.size()+healthy_files.size()) - (showed*10) >= 10 || remain_files == 0)
+			{
+				int idx = corupted_files_showd;
+				outfile << cor_files.size() - corupted_files_showd << endl;
+				corupted_files_showd = cor_files.size();
+				for (int i = idx; i < cor_files.size(); ++i)
+					outfile << cor_files[i] << endl;
+				showed++;
+			}
+		}
+		outfile.close();
+		exit(0);
+	}
+	else
+	{
+		//	Creation of pipes being started
+		for (int i = 0; i < process_count; ++i)
+		{
+			pipe(pfds[i]);
+			if ((pid[i] = fork()) == -1)
+			{
+				cout << "Fork Error\n";
+				return -1;
+			}
+			if (pid[i] == 0)
+			{
+				// child [i]
+				// cout << "child [" << i << "]\n";
+				close(pfds[i][1]);
+
+				int files_count;
+				char buf[MAX_BUFF_LEN];
+
+				read(pfds[i][0], buf, MAX_BUFF_LEN);			// read file text
+				close(pfds[i][0]);
+
+				files_count = get_files_count(buf);
+
+				string file_names[files_count];
+				bool correct_or_not[files_count];
+
+
+				int idx = get_start_idx(buf);					// skiping files count line
+				// cout << buf << endl;
+				// cout << idx << endl;
+				for (int z = 0; z < files_count; ++z)
+				{
+					string new_file = "";
+					int k;
+					for (k = idx; buf[k] != '\0'; ++k)
+					{
+						if (buf[k] != '|')
+						{
+							new_file += buf[k];
+							continue;
+						}
+						else
+							break;
+					}
+
+					idx = k+2;
+					file_names[z] = get_file_name(new_file);
+					// cout << "fz: " << new_file << endl;
+					correct_or_not[z] = parse_file(new_file);
+				}
+
+				// open write FIFO
+				fifo_wfd = open(FIFO_NAME, O_WRONLY);
+				for (int z = 0; z < files_count; ++z)
+				{
+					// cout << "file: " << file_names[z] << endl;
+					if (correct_or_not[z] == true)
+					{
+						write(fifo_wfd, (file_names[z] + ":t|" ).c_str(), (file_names[z] + ":t|" ).length() + 1);
+						// cout << "---" << file_names[z] << endl;
 					}
 					else
-						break;
+					{
+						write(fifo_wfd, (file_names[z] + ":f|" ).c_str(), (file_names[z] + ":f|" ).length() + 1);
+						// cout << "---" << file_names[z] << endl;
+					}
 				}
-
-				idx += k;
-				file_names[z] = get_file_name(new_file);
-				correct_or_not[z] = parse_file(new_file);
+				// close(fifo_wfd);
+				exit(0);
 			}
-
-			for (int z = 0; z < files_count; ++z)
+			else
 			{
-				if (correct_or_not[z])
-					cout << "file: \"" << file_names[z] << "\" is Correct\n";
-				else
-					cout << "file: \"" << file_names[z] << "\" is HAROOMI\n";	
-			}				
+				// parent [i]
+				close(pfds[i][0]);
+				string text = "";
+				string output = "";
+				int j;
+				for (j = 0; j < file_per_process && current_file_number < num_files; ++j)
+				{	
+					ifstream infile;
+					infile.open((dirname + files[current_file_number]).c_str());
+					
+					text += files[current_file_number];
+					text += '\n';
+					string line;
+					while(getline(infile, line))
+					{
+						text+=line;
+						text+='\n';
+					}
 
-			exit(0);
-		}
-		else
-		{
-			// parent [i]
-			close(pfds[i][0]);
-			string text = "";
-			string output = "";
-			int j;
-			for (j = 0; j < file_per_process && current_file_number < num_files; ++j)
-			{	
-				ifstream infile;
-				infile.open((dirname + files[current_file_number]).c_str());
+					infile.close();
+					
+					text += "|\n";
 				
-				text += files[current_file_number];
-				text += '\n';
-				string line;
-				while(getline(infile, line))
-				{
-					text+=line;
-					text+='\n';
+					current_file_number++;
 				}
 
-				infile.close();
-				
-				text += "|\n";
-			
-				current_file_number++;
+				output += to_string(j);
+				output += '\n';
+				output += text;
+				// cout << "output: \n\"" << output  << '\"' << endl;
+				write(pfds[i][1], output.c_str(), output.length() + 1);
+				close(pfds[i][1]);
 			}
+		}
 
-			output += to_string(j);
-			output += '\n';
-			output += text;
-			// cout << "output: \n\"" << output  << '\"' << endl;
-			write(pfds[i][1], output.c_str(), output.length() + 1);
-			close(pfds[i][1]);
+
+		// handle quit
+		string inst;
+		while(cin >> inst)
+		{
+			if (inst == "quit")
+			{
+				kill(0, SIGKILL);
+				return 0;
+			}
 		}
 	}
-
 	return 0;
 }
 
@@ -334,4 +469,15 @@ bool parse_file(string file)
 	}
 
 	return correct;
+}
+
+int count_files(string tmp)
+{
+	int cnt = 0;
+	for (int i = 0; i < tmp.length(); ++i)
+	{
+		if (tmp[i] == '|')
+			cnt++;	
+	}	
+	return cnt;
 }
