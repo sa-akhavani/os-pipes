@@ -29,4 +29,5 @@ User::User(int id, int cash)
 
 unsigned int get_files(string dirname, string* files);
 bool parse_file(string file);
+string get_file_name(string buf);
 #endif

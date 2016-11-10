@@ -37,37 +37,51 @@ int main(int argc, char *argv[])
 	}
 	if (pid == 0)	// child
 	{
+		// cout << "child!\n";
+		close(pfds[1]);
 		char buf[MAX_BUFF_LEN];
-		int nbytes;
-		vector<string> corrupted_file_names;
+		string file_name;
 		bool file_is_correct;
-		nbytes = read(pfds[0], buf, 100000);
-		cout << buf;
+		
+		read(pfds[0], buf, MAX_BUFF_LEN);			// read file text		
+		// cout << buf;
+		close(pfds[0]);
+		file_name = get_file_name(buf);
+		// cout << "file_name is: " << file_name << endl;
 		file_is_correct = parse_file(buf);
+
+
 		if (!file_is_correct)
-			cout << "file is HAROOMI\n";
+			cout << "file: \"" << file_name << "\" is HAROOMI\n";
+
+		exit(0);
 	}
 	else			// parent
 	{
+		close(pfds[0]);
 		ifstream infile;
 		infile.open((dirname + files[2]).c_str()); 
 		cout << "Reading from the file: " << dirname + files[2] << endl; 
-		string text = "";
+		// string text = "";
+		string text = files[2];
+		text += '\n';
 		string line;
 		while(getline(infile, line))
 		{
 			text+=line;
 			text+='\n';
 		}
-		write(pfds[1], text.c_str(), text.size());
 		infile.close();
-		cout << "Files Ended ^__^" << endl;
-		exit(0);		
+
+		write(pfds[1], text.c_str(), text.size() + 1);			// write file texts
+		close(pfds[1]);
+		
+		// cout << "Files Ended ^__^" << endl;
 	}
 
 	cout << "the end" << endl;
 
-	return 0;
+	// return 0;
 }
 
 unsigned int get_files(string dirname, string* files)
@@ -92,13 +106,31 @@ unsigned int get_files(string dirname, string* files)
 	return i;
 }
 
+string get_file_name(string buf)
+{
+	string file_name = "";
+	for (int i = 0; i < buf.length(); ++i)
+	{
+		if (buf[i] == ' ')
+			continue;
+		if(buf[i] == '\n')
+			break;
+		file_name += buf[i];
+	}
+
+	return file_name;
+}
+
+
 bool parse_file(string file)
 {
+	// cout << "parsing\n";
+
 	bool correct = true;
 	vector<User> users;
 	int id;
 	unsigned int cash;
-	cout << "parsing\n";
+
 	for(int i = 0; i < file.length(); i++)
 	{
 		string line = "";
@@ -154,12 +186,12 @@ bool parse_file(string file)
 					// cout << "found! " << users[z].id << endl;
 					if(users[z].cash < atoi(cash.c_str()))
 					{
-						cout << users[z].id << "  is HAROOMI" << endl;
+						cout << users[z].id << " is HAROOMI" << endl;
 						correct = false;
 					}
 					else
 					{
-						cout << users[z].id << "  is GOOD" << endl;
+						// cout << users[z].id << " is GOOD" << endl;
 					}
 
 					users[z].cash -= atoi(cash.c_str());
@@ -168,17 +200,17 @@ bool parse_file(string file)
 						if(users[k].id == atoi(reciever.c_str()) )
 						{
 							users[k].cash += atoi(cash.c_str());
-							cout << users[k].id << " has: " << users[k].cash << endl;
+							// cout << users[k].id << " has: " << users[k].cash << endl;
 							break;
 						}
 					}
-					cout << users[z].id << " has: " << users[z].cash << endl;
+					// cout << users[z].id << " has: " << users[z].cash << endl;
 					
 					break;
 				}
 			}			
 		}
-		else
+		else if (line.find(':') != string::npos)
 		{
 			// initial value
 			string user = "";
@@ -206,10 +238,13 @@ bool parse_file(string file)
 			}
 			User tmp(atoi(user.c_str()), atoi(cash.c_str()));
 			users.push_back(tmp);
-			cout << "user: " << tmp.id << " | cash: " << tmp.cash << endl;
+			// cout << "user: " << tmp.id << " | cash: " << tmp.cash << endl;
 		}
+		// else
+		// {
+		// 	cout << "this is file_name\n";
+		// }
 	}
 
 	return correct;
-
 }
