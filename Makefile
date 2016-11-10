@@ -1,4 +1,4 @@
-CC=g++
+CC=g++ -std=c++11
 all: a.out
 a.out: main.o
 	$(CC) main.o -o a.out

@@ -1,7 +1,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 #include <iostream>
-#include <cstdlib>
+#include <stdlib.h>
 #include <dirent.h>
 #include <cstring>
 #include <fstream>
@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <vector>
+#include <string>
 using namespace std;
 
 class User
@@ -30,4 +31,6 @@ User::User(int id, int cash)
 unsigned int get_files(string dirname, string* files);
 bool parse_file(string file);
 string get_file_name(string buf);
+int get_files_count(string buf);
+int get_start_idx(string buf);
 #endif
